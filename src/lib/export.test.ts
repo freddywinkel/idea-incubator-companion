@@ -1,0 +1,260 @@
+import { describe, it, expect } from 'vitest';
+import {
+  validateProcessingResult,
+  validateBackup,
+  computeImportDiff,
+  buildMarkdownExport,
+  getDrawHistoryAdditions,
+} from './export';
+import type {
+  BusinessCapture,
+  ProcessingResult,
+  AppBackup,
+  RecordItem,
+  Activity,
+  DrawHistoryEntry,
+} from '../types';
+
+const NOW = '2026-07-12T10:00:00.000Z';
+
+const makeCapture = (overrides: Partial<BusinessCapture> = {}): BusinessCapture => ({
+  id: 'uuid-1',
+  localId: 'CAP-20260712-001',
+  type: 'business',
+  rawWording: 'A test idea',
+  tags: [],
+  capturedAt: NOW,
+  updatedAt: NOW,
+  handoffState: 'unprocessed',
+  ...overrides,
+});
+
+const makeActivity = (overrides: Partial<Activity> = {}): Activity => ({
+  id: 'activity-1',
+  type: 'hobby',
+  title: 'Paint a small canvas',
+  tags: [],
+  moodTags: ['create'],
+  status: 'available',
+  pickCount: 0,
+  createdAt: NOW,
+  updatedAt: NOW,
+  ...overrides,
+});
+
+const makeHistoryEntry = (overrides: Partial<DrawHistoryEntry> = {}): DrawHistoryEntry => ({
+  id: 'history-1',
+  activityId: 'activity-1',
+  drawnAt: NOW,
+  criteria: {
+    time: '30m',
+    energy: 'medium',
+    mood: 'create',
+    strictMood: false,
+    includeBusiness: false,
+  },
+  action: 'started',
+  ...overrides,
+});
+
+const makeProcessingResult = (overrides: Partial<ProcessingResult> = {}): ProcessingResult => ({
+  schemaVersion: '1.0',
+  type: 'incubator-processing-result',
+  batchId: 'batch-1',
+  processedAt: NOW,
+  results: [{ captureId: 'CAP-001', outcome: 'created', ideaId: 'IDEA-001', note: 'Done' }],
+  ...overrides,
+});
+
+const makeBackup = (overrides: Partial<AppBackup> = {}): AppBackup => ({
+  schemaVersion: '1.0',
+  backupId: 'backup-1',
+  exportedAt: NOW,
+  appVersion: '1.0.0',
+  records: [makeCapture(), makeActivity()],
+  drawHistory: [makeHistoryEntry()],
+  ...overrides,
+});
+
+describe('validateProcessingResult', () => {
+  it('returns valid result for correct schema', () => {
+    const data = makeProcessingResult();
+    expect(validateProcessingResult(data)).toEqual(data);
+  });
+
+  it('returns null for invalid schema version', () => {
+    expect(validateProcessingResult({ ...makeProcessingResult(), schemaVersion: '2.0' })).toBeNull();
+  });
+
+  it('returns null for wrong type', () => {
+    expect(validateProcessingResult({ ...makeProcessingResult(), type: 'other' })).toBeNull();
+  });
+
+  it('returns null when required batch metadata is missing or invalid', () => {
+    const { batchId: _batchId, ...withoutBatchId } = makeProcessingResult();
+    expect(validateProcessingResult(withoutBatchId)).toBeNull();
+    expect(validateProcessingResult({ ...makeProcessingResult(), processedAt: 'not-a-timestamp' })).toBeNull();
+  });
+
+  it('returns null for invalid outcome', () => {
+    const data = {
+      ...makeProcessingResult(),
+      results: [{ captureId: 'CAP-001', outcome: 'invalid' }],
+    };
+    expect(validateProcessingResult(data)).toBeNull();
+  });
+
+  it('returns null for invalid ideaId format', () => {
+    const data = {
+      ...makeProcessingResult(),
+      results: [{ captureId: 'CAP-001', outcome: 'created', ideaId: 'IDEA-01' }],
+    };
+    expect(validateProcessingResult(data)).toBeNull();
+  });
+
+  it('accepts valid ideaId with 3+ digits', () => {
+    const data = {
+      ...makeProcessingResult(),
+      results: [{ captureId: 'CAP-001', outcome: 'created', ideaId: 'IDEA-123' }],
+    };
+    expect(validateProcessingResult(data)).not.toBeNull();
+  });
+
+  it('returns null for non-string notes and duplicate capture mappings', () => {
+    expect(
+      validateProcessingResult({
+        ...makeProcessingResult(),
+        results: [{ captureId: 'CAP-001', outcome: 'created', note: { unsafe: true } }],
+      })
+    ).toBeNull();
+    expect(
+      validateProcessingResult({
+        ...makeProcessingResult(),
+        results: [
+          { captureId: 'CAP-001', outcome: 'created' },
+          { captureId: 'CAP-001', outcome: 'duplicate' },
+        ],
+      })
+    ).toBeNull();
+  });
+});
+
+describe('validateBackup', () => {
+  it('returns valid backup for correct schema', () => {
+    const backup = makeBackup();
+    expect(validateBackup(backup)).toEqual(backup);
+  });
+
+  it('returns null for missing schemaVersion', () => {
+    expect(validateBackup({ records: [], drawHistory: [] })).toBeNull();
+  });
+
+  it('returns null for non-array records', () => {
+    expect(validateBackup({ ...makeBackup(), records: 'bad' })).toBeNull();
+  });
+
+  it('validates every record instead of only an initial sample', () => {
+    const validRecords = Array.from({ length: 5 }, (_, index) =>
+      makeCapture({
+        id: `uuid-${index + 1}`,
+        localId: `CAP-20260712-${String(index + 1).padStart(3, '0')}`,
+      })
+    );
+    const malformedSixthRecord = { id: 'activity-broken', type: 'hobby', title: 'Missing required fields' };
+    expect(
+      validateBackup({ ...makeBackup(), records: [...validRecords, malformedSixthRecord] })
+    ).toBeNull();
+  });
+
+  it('returns null for malformed business or activity fields', () => {
+    expect(
+      validateBackup({ ...makeBackup(), records: [makeCapture({ localId: 'CAP-001' })] })
+    ).toBeNull();
+    expect(
+      validateBackup({ ...makeBackup(), records: [{ ...makeActivity(), moodTags: ['unsupported'] }] })
+    ).toBeNull();
+  });
+
+  it('returns null for malformed draw history', () => {
+    expect(
+      validateBackup({
+        ...makeBackup(),
+        drawHistory: [{ ...makeHistoryEntry(), criteria: { time: '30m' } }],
+      })
+    ).toBeNull();
+  });
+
+  it('returns null for duplicate immutable IDs', () => {
+    expect(
+      validateBackup({
+        ...makeBackup(),
+        records: [makeCapture({ id: 'same' }), makeActivity({ id: 'same' })],
+      })
+    ).toBeNull();
+    expect(
+      validateBackup({
+        ...makeBackup(),
+        drawHistory: [makeHistoryEntry(), makeHistoryEntry({ activityId: 'activity-2' })],
+      })
+    ).toBeNull();
+  });
+});
+
+describe('getDrawHistoryAdditions', () => {
+  it('restores only missing history entries during a merge', () => {
+    const current = [makeHistoryEntry({ id: 'existing', action: 'started' })];
+    const incoming = [
+      makeHistoryEntry({ id: 'existing', action: 'done' }),
+      makeHistoryEntry({ id: 'new', activityId: 'activity-2' }),
+    ];
+
+    expect(getDrawHistoryAdditions(current, incoming)).toEqual([incoming[1]]);
+  });
+});
+
+describe('computeImportDiff', () => {
+  it('identifies additions for new records', () => {
+    const current: RecordItem[] = [makeCapture({ id: 'existing' })];
+    const incoming: RecordItem[] = [makeCapture({ id: 'existing' }), makeCapture({ id: 'new' })];
+    const diff = computeImportDiff(current, incoming);
+    expect(diff.additions).toHaveLength(1);
+    expect(diff.additions[0].id).toBe('new');
+    expect(diff.unchanged).toHaveLength(1);
+  });
+
+  it('identifies updates when same ID but different content', () => {
+    const current: RecordItem[] = [makeCapture({ id: 'same', workingTitle: 'Old' })];
+    const incoming: RecordItem[] = [makeCapture({ id: 'same', workingTitle: 'New', updatedAt: new Date(Date.now() + 1000).toISOString() })];
+    const diff = computeImportDiff(current, incoming);
+    expect(diff.updates).toHaveLength(1);
+    expect((diff.updates[0].updated as BusinessCapture).workingTitle).toBe('New');
+  });
+
+  it('identifies conflicts when timestamps are equal', () => {
+    const now = new Date().toISOString();
+    const current: RecordItem[] = [makeCapture({ id: 'same', workingTitle: 'A', updatedAt: now })];
+    const incoming: RecordItem[] = [makeCapture({ id: 'same', workingTitle: 'B', updatedAt: now })];
+    const diff = computeImportDiff(current, incoming);
+    expect(diff.conflicts).toHaveLength(1);
+  });
+});
+
+describe('buildMarkdownExport', () => {
+  it('preserves raw wording exactly with Unicode and emojis', () => {
+    const capture = makeCapture({ rawWording: 'Café app for 🐶 walkers — track routes & tips!' });
+    const md = buildMarkdownExport([capture]);
+    expect(md).toContain('Café app for 🐶 walkers — track routes & tips!');
+  });
+
+  it('includes processing instructions at the top', () => {
+    const md = buildMarkdownExport([makeCapture()]);
+    expect(md).toContain('These are unprocessed captures from the Idea Jar companion app');
+    expect(md).toContain('IDEA-###');
+  });
+
+  it('includes local capture ID and status', () => {
+    const md = buildMarkdownExport([makeCapture({ localId: 'CAP-20260712-001', handoffState: 'unprocessed' })]);
+    expect(md).toContain('CAP-20260712-001');
+    expect(md).toContain('unprocessed');
+  });
+});

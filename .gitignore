@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Generated user data (never commit real captures, exports, or backups)
+*.md-export
+*.json-export
+*.backup.json
+YYYY-MM-DD-business-idea-inbox-*.md
+YYYY-MM-DD-business-idea-batch-*.json
+idea-jar-backup-*.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
