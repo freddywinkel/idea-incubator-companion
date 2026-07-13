@@ -1,12 +1,12 @@
 # Integration Contract: Idea Jar ↔ Business Idea Incubator
 
-**Version:** 1.0
-**Date:** 2026-07-12
+**Version:** 1.1
+**Date:** 2026-07-13
 **Status:** Frozen
 
 ## Roles
 
-- **Idea Jar (PWA):** Capture-and-staging companion. Generates local capture IDs. Never assigns official Idea IDs.
+- **Idea Jar (PWA):** Capture-and-staging companion plus personal Activity Jar and Wishlist. Generates local capture IDs. Never assigns official Idea IDs.
 - **Business Idea Incubator (ChatGPT Work):** Master portfolio system. Owns `IDEA-###` identifiers, the master workbook, and narrative records.
 
 ## Export from Idea Jar to Incubator
@@ -85,6 +85,15 @@ Schema: `ProcessingResult` (see `src/types/index.ts`)
 | Next actions | Receives | Owns |
 | Master workbook | Never edits | Owns |
 | Narrative idea record | Never edits | Owns |
+| Personal activities | Owns locally; never exports by default | Does not receive |
+| Wishlist and savings | Owns locally; never exports as business data | Does not receive |
+
+## Full app backup
+
+- Backup schema 1.1 stores business captures, activities, wishlist items, savings progress, and draw history.
+- Schema 1.0 backups remain importable and are treated as having no wishlist data.
+- A Merge from a schema 1.0 backup preserves the current wishlist. Replace all restores the older backup exactly and therefore clears current wishlist items after warning the user.
+- Full backups are for app recovery only. They are not Business Incubator imports.
 
 ## Non-negotiables
 
@@ -92,5 +101,6 @@ Schema: `ProcessingResult` (see `src/types/index.ts`)
 2. ChatGPT Work checks for duplicates before assigning new IDs.
 3. Unknown business fields remain blank in the Incubator.
 4. User’s original raw wording is preserved exactly.
-5. Business captures and personal activities remain separate by default.
-6. No personal activity is included in a Business Incubator export unless explicitly selected.
+5. Business captures, personal activities, and wishlist items remain separate.
+6. Personal activities and wishlist items never appear in Business Incubator exports.
+7. Wishlist items never enter the Today activity picker.

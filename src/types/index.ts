@@ -62,6 +62,22 @@ export interface Activity {
   updatedAt: string; // ISO timestamp
 }
 
+export type WishlistStatus = 'active' | 'bought' | 'archived';
+
+export interface WishlistItem {
+  id: string; // internal UUID
+  type: 'wishlist';
+  title: string;
+  notes?: string;
+  productUrl?: string;
+  targetPriceCents?: number;
+  savedAmountCents: number;
+  status: WishlistStatus;
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+  boughtAt?: string; // ISO timestamp
+}
+
 export type RecordItem = BusinessCapture | Activity;
 
 export function isBusinessCapture(item: RecordItem): item is BusinessCapture {
@@ -126,12 +142,13 @@ export interface ProcessingResult {
 }
 
 export interface AppBackup {
-  schemaVersion: '1.0';
+  schemaVersion: '1.0' | '1.1';
   backupId: string;
   exportedAt: string;
   appVersion: string;
   records: RecordItem[];
   drawHistory: DrawHistoryEntry[];
+  wishlistItems: WishlistItem[];
 }
 
 export interface DrawHistoryEntry {
@@ -142,9 +159,14 @@ export interface DrawHistoryEntry {
   action: 'started' | 'snoozed' | 'picked_another' | 'done' | 'made_smaller';
 }
 
-export interface ImportDiff {
-  additions: RecordItem[];
-  updates: Array<{ old: RecordItem; updated: RecordItem }>;
-  conflicts: Array<{ current: RecordItem; incoming: RecordItem }>;
-  unchanged: RecordItem[];
+export interface ImportDiff<T extends { id: string; updatedAt: string } = RecordItem> {
+  additions: T[];
+  updates: Array<{ old: T; updated: T }>;
+  conflicts: Array<{ current: T; incoming: T }>;
+  unchanged: T[];
+}
+
+export interface BackupImportDiff {
+  records: ImportDiff<RecordItem>;
+  wishlistItems: ImportDiff<WishlistItem>;
 }

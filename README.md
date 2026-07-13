@@ -1,6 +1,6 @@
 # Idea Jar — Incubator Companion
 
-A calm, offline-first companion app for capturing business ideas and choosing what to do next from your Activity Jar.
+A calm, offline-first companion app for capturing business ideas, choosing what to do next from your Activity Jar, and tracking savings for things you would like to buy.
 
 **Live app:** [freddywinkel.github.io/idea-incubator-companion](https://freddywinkel.github.io/idea-incubator-companion/)
 
@@ -8,10 +8,11 @@ A calm, offline-first companion app for capturing business ideas and choosing wh
 
 ## What this app does
 
-**Idea Jar** helps you in two ways:
+**Idea Jar** helps you in three ways:
 
 1. **Quickly capture business ideas** on the go, then export them as a Markdown file that ChatGPT Work (your Business Idea Incubator) can process.
 2. **Maintain an Activity Jar** of hobbies, DIY projects, AI projects, learning ideas, and other small activities. When you are not sure what to do, the app suggests one thing based on your current time, energy, and mood.
+3. **Keep a personal Wishlist** for things you may want to buy. Add an optional target price, record how much you have saved, and see the amount remaining.
 
 The app is intentionally simple, calm, and offline-first. There are no accounts, no cloud databases, no analytics, and no tracking.
 
@@ -36,9 +37,19 @@ The app is intentionally simple, calm, and offline-first. There are no accounts,
 
 1. Open the app and tap **Capture**.
 2. Type your idea in the **"What's on your mind?"** box.
-3. Choose a type: Business idea, Hobby, DIY project, AI project, Learning, or Other.
+3. Choose a type: Business idea, Wishlist, Hobby, DIY project, AI project, Learning, or Other.
 4. Tap **Save quickly** (under 20 seconds).
 5. Or tap **Add details** to fill in optional fields later.
+
+### Track a wishlist purchase
+
+1. Tap **Capture**, choose **Wishlist**, and enter the item name.
+2. Tap **Save quickly**, or add an optional target price, amount already saved, product link, and notes.
+3. Open **Library → Wishlist** to see active items and savings progress.
+4. Tap **Add savings** whenever you put money aside. You can also set or correct the goal later.
+5. Mark the item as bought, archive it, or move it back to the wishlist at any time.
+
+Wishlist items stay personal. They do not appear in the Today picker or Business Incubator exports.
 
 ### Get a suggestion for today
 
@@ -70,14 +81,14 @@ The app is intentionally simple, calm, and offline-first. There are no accounts,
 
 1. Tap **Export**.
 2. In the **Backup & Restore** section, tap **Download full backup**.
-3. Save the JSON file somewhere safe (cloud storage, email, etc.).
+3. Save the JSON file somewhere safe (cloud storage, email, etc.). The backup includes business captures, activities, wishlist items, savings progress, and draw history.
 4. To restore, tap **Choose file** and select your backup JSON.
 5. Preview the changes, then choose **Merge** or **Replace all**.
 
 ## Important privacy notes
 
 - **Your data lives in this browser on this device.** It is stored in IndexedDB (a local browser database).
-- **Clearing browser data or site storage will erase your ideas.** Regular backups are strongly recommended.
+- **Clearing browser data or site storage will erase your ideas, activities, and wishlist.** Regular backups are strongly recommended.
 - **GitHub hosts the app code, not your ideas.** The repository contains only fake sample data, never your real captures.
 - **No accounts, no servers, no analytics, no tracking.** Everything happens locally in your browser.
 
@@ -112,6 +123,7 @@ The GitHub Pages path is intentionally configured for the repository name `idea-
 - No photos, file attachments, or speech transcription.
 - No calendar integration, recurring plans, or session timer.
 - No direct ChatGPT or OpenAI API integration.
+- Wishlist savings use one running euro total per item; there is no transaction history, budget, reminder, or automatic price tracking.
 
 ## Support
 

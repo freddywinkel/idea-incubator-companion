@@ -4,6 +4,7 @@ import {
   validateBackup,
   computeImportDiff,
   buildMarkdownExport,
+  buildAppBackup,
   getDrawHistoryAdditions,
 } from './export';
 import type {
@@ -13,6 +14,7 @@ import type {
   RecordItem,
   Activity,
   DrawHistoryEntry,
+  WishlistItem,
 } from '../types';
 
 const NOW = '2026-07-12T10:00:00.000Z';
@@ -57,6 +59,19 @@ const makeHistoryEntry = (overrides: Partial<DrawHistoryEntry> = {}): DrawHistor
   ...overrides,
 });
 
+const makeWishlistItem = (overrides: Partial<WishlistItem> = {}): WishlistItem => ({
+  id: 'wishlist-1',
+  type: 'wishlist',
+  title: 'A useful thing',
+  productUrl: 'https://example.com/product',
+  targetPriceCents: 12_500,
+  savedAmountCents: 2_500,
+  status: 'active',
+  createdAt: NOW,
+  updatedAt: NOW,
+  ...overrides,
+});
+
 const makeProcessingResult = (overrides: Partial<ProcessingResult> = {}): ProcessingResult => ({
   schemaVersion: '1.0',
   type: 'incubator-processing-result',
@@ -67,12 +82,13 @@ const makeProcessingResult = (overrides: Partial<ProcessingResult> = {}): Proces
 });
 
 const makeBackup = (overrides: Partial<AppBackup> = {}): AppBackup => ({
-  schemaVersion: '1.0',
+  schemaVersion: '1.1',
   backupId: 'backup-1',
   exportedAt: NOW,
-  appVersion: '1.0.0',
+  appVersion: '1.1.0',
   records: [makeCapture(), makeActivity()],
   drawHistory: [makeHistoryEntry()],
+  wishlistItems: [makeWishlistItem()],
   ...overrides,
 });
 
@@ -145,6 +161,44 @@ describe('validateBackup', () => {
     expect(validateBackup(backup)).toEqual(backup);
   });
 
+  it('builds and validates a v1.1 backup with wishlist items kept separate', () => {
+    const records = [makeCapture(), makeActivity()];
+    const drawHistory = [makeHistoryEntry()];
+    const wishlistItems = [makeWishlistItem()];
+
+    const backup = buildAppBackup({ records, drawHistory, wishlistItems });
+
+    expect(backup).toMatchObject({
+      schemaVersion: '1.1',
+      appVersion: '1.1.0',
+      records,
+      drawHistory,
+      wishlistItems,
+    });
+    expect(validateBackup(backup)).toEqual(backup);
+  });
+
+  it('normalizes a legacy v1.0 backup without wishlist data', () => {
+    const legacyBackup = {
+      schemaVersion: '1.0',
+      backupId: 'legacy-backup',
+      exportedAt: NOW,
+      appVersion: '1.0.0',
+      records: [makeCapture(), makeActivity()],
+      drawHistory: [makeHistoryEntry()],
+    };
+
+    expect(validateBackup(legacyBackup)).toEqual({
+      ...legacyBackup,
+      wishlistItems: [],
+    });
+  });
+
+  it('requires the separate wishlist array in v1.1 backups', () => {
+    const { wishlistItems: _wishlistItems, ...withoutWishlistItems } = makeBackup();
+    expect(validateBackup(withoutWishlistItems)).toBeNull();
+  });
+
   it('returns null for missing schemaVersion', () => {
     expect(validateBackup({ records: [], drawHistory: [] })).toBeNull();
   });
@@ -175,6 +229,39 @@ describe('validateBackup', () => {
     ).toBeNull();
   });
 
+  it('returns null for malformed wishlist amounts', () => {
+    const invalidItems = [
+      makeWishlistItem({ savedAmountCents: -1 }),
+      makeWishlistItem({ savedAmountCents: 1.5 }),
+      makeWishlistItem({ savedAmountCents: Number.NaN }),
+      makeWishlistItem({ savedAmountCents: Number.POSITIVE_INFINITY }),
+      makeWishlistItem({ targetPriceCents: -1 }),
+      makeWishlistItem({ targetPriceCents: 1.5 }),
+      makeWishlistItem({ targetPriceCents: Number.NaN }),
+      makeWishlistItem({ targetPriceCents: Number.POSITIVE_INFINITY }),
+    ];
+
+    for (const item of invalidItems) {
+      expect(validateBackup({ ...makeBackup(), wishlistItems: [item] })).toBeNull();
+    }
+  });
+
+  it('returns null for malformed wishlist status, URL, or timestamps', () => {
+    const invalidItems = [
+      { ...makeWishlistItem(), status: 'saving' },
+      makeWishlistItem({ productUrl: 'javascript:alert(1)' }),
+      makeWishlistItem({ productUrl: 'ftp://example.com/product' }),
+      makeWishlistItem({ productUrl: 'not a URL' }),
+      makeWishlistItem({ createdAt: 'not-a-timestamp' }),
+      makeWishlistItem({ updatedAt: 'not-a-timestamp' }),
+      makeWishlistItem({ boughtAt: 'not-a-timestamp' }),
+    ];
+
+    for (const item of invalidItems) {
+      expect(validateBackup({ ...makeBackup(), wishlistItems: [item] })).toBeNull();
+    }
+  });
+
   it('returns null for malformed draw history', () => {
     expect(
       validateBackup({
@@ -195,6 +282,24 @@ describe('validateBackup', () => {
       validateBackup({
         ...makeBackup(),
         drawHistory: [makeHistoryEntry(), makeHistoryEntry({ activityId: 'activity-2' })],
+      })
+    ).toBeNull();
+    expect(
+      validateBackup({
+        ...makeBackup(),
+        wishlistItems: [
+          makeWishlistItem({ id: 'same' }),
+          makeWishlistItem({ id: 'same', title: 'Another item' }),
+        ],
+      })
+    ).toBeNull();
+  });
+
+  it('returns null when a wishlist ID collides with a record ID', () => {
+    expect(
+      validateBackup({
+        ...makeBackup(),
+        wishlistItems: [makeWishlistItem({ id: 'uuid-1' })],
       })
     ).toBeNull();
   });

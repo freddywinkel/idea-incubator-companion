@@ -1,7 +1,7 @@
 # Design: Idea Jar — Incubator Companion
 
 ## Product concept
-A calm, mobile-first, installable PWA for someone who has many business ideas, hobbies, DIY ideas, and AI-project ideas but sometimes experiences decision paralysis. Two distinct purposes: (1) quickly collect unprocessed business ideas and export them to ChatGPT Work, and (2) maintain an Activity Jar and choose one thing to do based on time, energy, and mood.
+A calm, mobile-first, installable PWA for someone who has many business ideas, hobbies, DIY ideas, AI-project ideas, and things they may want to buy but sometimes experiences decision paralysis. Three distinct purposes: (1) quickly collect unprocessed business ideas and export them to ChatGPT Work, (2) maintain an Activity Jar and choose one thing to do based on time, energy, and mood, and (3) keep a personal wishlist with simple per-item savings progress.
 
 ## Target user
 Creative person with many interests, some decision paralysis, wants a supportive offline tool that feels calm and trustworthy.
@@ -10,8 +10,8 @@ Creative person with many interests, some decision paralysis, wants a supportive
 HashRouter for GitHub Pages compatibility. Four main tabs with mobile bottom navigation:
 
 1. **Today** (`#/today`) — Activity Jar picker. One result card. Time/energy/mood filters.
-2. **Capture** (`#/capture`) — Fast capture form. "What's on your mind?" textarea, type selector, then expand optional fields.
-3. **Library** (`#/library`) — Two tabs: Business Inbox and My Activities. Search + filters.
+2. **Capture** (`#/capture`) — Fast capture form. "What's on your mind?" textarea, including a separate Wishlist type with optional target price, saved amount, product link, and notes.
+3. **Library** (`#/library`) — Three horizontally scrollable tabs: Business Inbox, My Activities, and Wishlist. Search + filters.
 4. **Export & Backup** (`#/export`) — Export Markdown/JSON, import processing results, full backup/restore.
 
 ## Color palette
@@ -61,6 +61,7 @@ Warm, restrained, calm. No blue-purple gradients or highly saturated backgrounds
 - `Modal` — overlay with dismissible card, focus trap
 - `Toast` — brief non-intrusive confirmation messages, 4 seconds
 - `ActivityCard` — result card from picker with actions
+- `WishlistList` — savings summary, searchable/filterable wishlist cards, progress bars, and focused edit/savings dialogs
 - `FilterBar` — horizontal scrollable chips for filter options
 
 ## Interaction language
@@ -78,6 +79,14 @@ Warm, restrained, calm. No blue-purple gradients or highly saturated backgrounds
 - lucide-react (icons)
 - vite-plugin-pwa (PWA manifest, service worker, icons)
 - No heavy UI framework. Plain CSS with CSS variables.
+
+## Wishlist data boundary
+
+- Wishlist items use a dedicated IndexedDB store and are not Activities.
+- Money is stored as nonnegative integer euro cents to avoid floating-point drift.
+- Goal-reached state and remaining amount are derived from the target and saved totals.
+- Wishlist items never enter the Today picker or Business Incubator exports.
+- Full app backup/restore includes wishlist items and savings progress; legacy schema 1.0 backups remain importable.
 
 ## Asset manifest
 - `public/icons/icon-192x192.png` — PWA icon 192px

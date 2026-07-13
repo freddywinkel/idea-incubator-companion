@@ -6,16 +6,21 @@ import {
   type CaptureType,
   type BusinessCapture,
   type Activity,
+  type WishlistItem,
   type MoodTag,
   type TimeEstimate,
   type EnergyLevel,
   type CostBand,
   type MaterialsReady,
 } from '../types';
+import { parseEuroToCents } from '../lib/wishlist';
 import { Sparkles, ChevronDown, ChevronUp, Check } from 'lucide-react';
 
-const CAPTURE_TYPES: { type: CaptureType; label: string }[] = [
+type CaptureChoice = CaptureType | 'wishlist';
+
+const CAPTURE_TYPES: { type: CaptureChoice; label: string }[] = [
   { type: 'business', label: 'Business idea' },
+  { type: 'wishlist', label: 'Wishlist' },
   { type: 'hobby', label: 'Hobby' },
   { type: 'diy', label: 'DIY project' },
   { type: 'ai-project', label: 'AI project' },
@@ -68,13 +73,22 @@ function parseTags(tagString: string): string[] {
     .filter((t) => t.length > 0);
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export const CapturePage: React.FC = () => {
-  const { saveCapture, saveAct, getNextId } = useAppData();
+  const { saveCapture, saveAct, saveWish, getNextId } = useAppData();
   const { showToast } = useToast();
 
   // Core fields
   const [rawThought, setRawThought] = useState('');
-  const [captureType, setCaptureType] = useState<CaptureType>('business');
+  const [captureType, setCaptureType] = useState<CaptureChoice>('business');
   const [expanded, setExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -105,7 +119,15 @@ export const CapturePage: React.FC = () => {
   const [smallestStep, setSmallestStep] = useState('');
   const [fiveMinuteVersion, setFiveMinuteVersion] = useState('');
 
+  // Wishlist fields
+  const [wishTargetPrice, setWishTargetPrice] = useState('');
+  const [wishSavedAmount, setWishSavedAmount] = useState('');
+  const [wishProductUrl, setWishProductUrl] = useState('');
+  const [wishNotes, setWishNotes] = useState('');
+
   const isBusiness = captureType === 'business';
+  const isWishlist = captureType === 'wishlist';
+  const capturePrompt = isWishlist ? 'What would you like to buy?' : "What's on your mind?";
 
   const resetForm = useCallback(() => {
     setRawThought('');
@@ -133,6 +155,10 @@ export const CapturePage: React.FC = () => {
     setMaterialsReady('');
     setSmallestStep('');
     setFiveMinuteVersion('');
+    setWishTargetPrice('');
+    setWishSavedAmount('');
+    setWishProductUrl('');
+    setWishNotes('');
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -145,7 +171,7 @@ export const CapturePage: React.FC = () => {
     try {
       const now = new Date().toISOString();
 
-      if (isBusiness) {
+      if (captureType === 'business') {
         const localId = await getNextId();
         const capture: BusinessCapture = {
           id: generateUUID(),
@@ -168,6 +194,34 @@ export const CapturePage: React.FC = () => {
         };
         await saveCapture(capture);
         showToast('Business idea saved', 'success');
+      } else if (captureType === 'wishlist') {
+        const targetPriceCents = parseEuroToCents(wishTargetPrice);
+        const savedAmountCents = parseEuroToCents(wishSavedAmount);
+        const productUrl = wishProductUrl.trim();
+
+        if (targetPriceCents === null || targetPriceCents === 0 || savedAmountCents === null) {
+          showToast('Enter a valid target price and saved amount.', 'error');
+          return;
+        }
+        if (productUrl && !isHttpUrl(productUrl)) {
+          showToast('Enter a product link starting with http:// or https://.', 'error');
+          return;
+        }
+
+        const wishlistItem: WishlistItem = {
+          id: generateUUID(),
+          type: 'wishlist',
+          title: rawThought.trim(),
+          notes: wishNotes.trim() || undefined,
+          productUrl: productUrl || undefined,
+          targetPriceCents,
+          savedAmountCents: savedAmountCents ?? 0,
+          status: 'active',
+          createdAt: now,
+          updatedAt: now,
+        };
+        await saveWish(wishlistItem);
+        showToast('Wishlist item saved', 'success');
       } else {
         const activity: Activity = {
           id: generateUUID(),
@@ -204,7 +258,6 @@ export const CapturePage: React.FC = () => {
   }, [
     rawThought,
     captureType,
-    isBusiness,
     getNextId,
     workingTitle,
     category,
@@ -228,8 +281,13 @@ export const CapturePage: React.FC = () => {
     materialsReady,
     smallestStep,
     fiveMinuteVersion,
+    wishTargetPrice,
+    wishSavedAmount,
+    wishProductUrl,
+    wishNotes,
     saveCapture,
     saveAct,
+    saveWish,
     showToast,
     resetForm,
   ]);
@@ -250,14 +308,14 @@ export const CapturePage: React.FC = () => {
         {/* Raw thought textarea */}
         <div className="form-group">
           <label htmlFor="raw-thought" className="sr-only">
-            What's on your mind?
+            {capturePrompt}
           </label>
           <textarea
             id="raw-thought"
             value={rawThought}
             onChange={(e) => setRawThought(e.target.value)}
-            placeholder="What's on your mind?"
-            aria-label="What's on your mind?"
+            placeholder={capturePrompt}
+            aria-label={capturePrompt}
             rows={4}
             style={{
               fontSize: '1.25rem',
@@ -469,6 +527,70 @@ export const CapturePage: React.FC = () => {
                     value={bizTags}
                     onChange={(e) => setBizTags(e.target.value)}
                     placeholder="Comma-separated tags"
+                  />
+                </div>
+              </>
+            ) : isWishlist ? (
+              <>
+                <p
+                  style={{
+                    marginBottom: 16,
+                    color: 'var(--color-text-secondary)',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  All fields are optional. Add a price when you are ready to track savings.
+                </p>
+
+                <div className="form-group">
+                  <label htmlFor="wish-target-price">Target price (€)</label>
+                  <input
+                    id="wish-target-price"
+                    type="text"
+                    inputMode="decimal"
+                    value={wishTargetPrice}
+                    onChange={(event) => setWishTargetPrice(event.target.value)}
+                    placeholder="e.g. 300"
+                    aria-describedby="wish-price-help"
+                  />
+                  <span id="wish-price-help" className="wishlist-field-help">
+                    Leave blank if you do not know the price yet.
+                  </span>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="wish-saved-amount">Saved so far (€)</label>
+                  <input
+                    id="wish-saved-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={wishSavedAmount}
+                    onChange={(event) => setWishSavedAmount(event.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="wish-product-url">Product link</label>
+                  <input
+                    id="wish-product-url"
+                    type="url"
+                    inputMode="url"
+                    value={wishProductUrl}
+                    onChange={(event) => setWishProductUrl(event.target.value)}
+                    placeholder="https://…"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="wish-notes">Notes</label>
+                  <textarea
+                    id="wish-notes"
+                    value={wishNotes}
+                    onChange={(event) => setWishNotes(event.target.value)}
+                    placeholder="Size, model, shop, or anything you want to remember"
+                    rows={3}
+                    style={{ minHeight: 80 }}
                   />
                 </div>
               </>
