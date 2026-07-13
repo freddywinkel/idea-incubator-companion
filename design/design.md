@@ -11,7 +11,7 @@ HashRouter for GitHub Pages compatibility. Four main tabs with mobile bottom nav
 
 1. **Today** (`#/today`) — Activity Jar picker. One result card. Time/energy/mood filters.
 2. **Capture** (`#/capture`) — Fast capture form. "What's on your mind?" textarea, including a separate Wishlist type with optional target price, saved amount, product link, and notes.
-3. **Library** (`#/library`) — Three horizontally scrollable tabs: Business Inbox, My Activities, and Wishlist. Search + filters.
+3. **Library** (`#/library`) — Three always-visible segmented tabs: Business, Activities, and Wishlist. Search + filters.
 4. **Export & Backup** (`#/export`) — Export Markdown/JSON, import processing results, full backup/restore.
 
 ## Color palette
@@ -22,14 +22,14 @@ Warm, restrained, calm. No blue-purple gradients or highly saturated backgrounds
 - `--color-surface-raised: #F5F0E8` — slightly raised surfaces, secondary backgrounds
 - `--color-text: #2A2520` — primary text, warm near-black
 - `--color-text-secondary: #6B6560` — secondary/muted text
-- `--color-text-tertiary: #9A9490` — placeholders, disabled
-- `--color-accent: #C17A47` — warm amber/terracotta accent
-- `--color-accent-soft: #E8D5C4` — accent tint for backgrounds, borders
-- `--color-success: #6B8E5A` — soft green for "done", success
+- `--color-text-tertiary: #756F6A` — placeholders, disabled
+- `--color-accent: #9E5F32` — accessible warm amber/terracotta accent
+- `--color-accent-soft: #F0DFD1` — accent tint for backgrounds, borders
+- `--color-success: #557A46` — soft green for "done", success
 - `--color-warning: #D4A843` — soft gold for warnings, snoozed
-- `--color-danger: #B85C5C` — muted red for destructive actions
+- `--color-danger: #B25555` — muted red for destructive actions
 - `--color-border: #E8E2DA` — dividers, borders
-- `--color-focus: #C17A47` — focus ring matches accent
+- `--color-focus: #9E5F32` — focus ring matches accent
 
 ## Typography
 - System font stack: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`
@@ -42,8 +42,8 @@ Warm, restrained, calm. No blue-purple gradients or highly saturated backgrounds
 ## Layout rules
 - Mobile-first: max-width 430px layout centered on larger screens with comfortable margins
 - Desktop: centered card layout, max-width 720px, generous whitespace
-- Bottom nav: fixed at bottom, 64px height, safe-area-inset padding
-- Content area: `padding-bottom: calc(64px + env(safe-area-inset-bottom))`
+- Bottom nav: fixed at bottom with a dedicated 68px control row plus a separate safe-area inset layer
+- Content area: reserves the 68px navigation row, bottom safe area, and 20px breathing room
 - Cards: 16px border-radius, 1px border `--color-border`, subtle shadow `0 1px 3px rgba(0,0,0,0.04)`
 - Buttons: min-height 48px, 12px border-radius, 16px horizontal padding
 - Inputs: 48px min-height, 12px border-radius, 1px border, focus ring 2px offset
@@ -62,7 +62,7 @@ Warm, restrained, calm. No blue-purple gradients or highly saturated backgrounds
 - `Toast` — brief non-intrusive confirmation messages, 4 seconds
 - `ActivityCard` — result card from picker with actions
 - `WishlistList` — savings summary, searchable/filterable wishlist cards, progress bars, and focused edit/savings dialogs
-- `FilterBar` — horizontal scrollable chips for filter options
+- `FilterBar` — visible wrapping chips; no hidden horizontal scroller
 
 ## Interaction language
 - Transitions: 150ms ease for colors, 200ms ease for transforms
@@ -97,6 +97,7 @@ Warm, restrained, calm. No blue-purple gradients or highly saturated backgrounds
 
 ## Responsive
 - Phone: full-width cards, bottom nav, stacked forms
+- Narrow phone: all choice chips wrap in place, the three Library tabs stay visible, and custom text wraps instead of escaping its control
 - Tablet: 2-column layouts where appropriate (Library filters + list)
 - Desktop: centered layout, max-width 720px, side padding
 

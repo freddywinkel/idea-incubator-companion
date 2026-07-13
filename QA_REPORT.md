@@ -1,4 +1,4 @@
-# Test and QA Report — Idea Jar v1.1
+# Test and QA Report — Idea Jar v1.2.1 release candidate
 
 **Date:** 2026-07-13
 **Tester:** Build agent + automated validation
@@ -41,9 +41,12 @@
 | 14 | Production build has no console errors | ✅ | Build output clean; interactive browser walkthrough reported no warning/error logs |
 | 15 | Manifest, icons, service worker, and update flow work correctly | ✅ | Generated manifest/service worker/icons verified; offline-ready and user-controlled update prompts exercised |
 | 16 | Deployed app loads correctly under GitHub repository subpath | ✅ | `base: '/idea-incubator-companion/'` in vite.config.ts; HashRouter for refreshes |
-| 17 | Phone and desktop layouts receive manual QA | ✅ | Wishlist checked at 320×844 and 390×844; selected tabs scroll into view, page width does not overflow, and bottom navigation remains usable |
+| 17 | Phone and desktop layouts receive manual QA | ✅ | All routes checked at 320, 375, 390, and 430 px; no page or control-row overflow, all Library tabs remain visible, and the bottom navigation keeps its full control height |
 | 18 | No real user content, secret, token, analytics, or remote tracking | ✅ | Privacy audit: no API keys, no analytics scripts, no external CDN, no fetch to third parties |
 | 19 | Wishlist savings are useful without contaminating other workflows | ✅ | Quick capture works without a price; savings update precisely; Wishlist is absent from Today and Business Export |
+| 20 | Phone safe areas do not compress or cover navigation | ✅ | The 68 px navigation row is separate from the home-indicator inset; a simulated 34 px inset preserved the full row and matching content clearance |
+| 21 | Selection controls remain visible and touch-friendly | ✅ | Filter choices wrap instead of hiding in scrollbar-free rails; tabs are 48 px, built-in chips are at least 44 px, and the strict-mood row is fully tappable |
+| 22 | Initial loading and PWA notices do not show false empty states or cover controls | ✅ | Today and Export wait for IndexedDB; the update notice participates in document flow instead of overlaying page actions |
 
 ## Interactive browser walkthrough
 
@@ -53,6 +56,11 @@
 - Confirmed the Today screen still reports zero activities when only wishlist items exist.
 - Confirmed Business Export reports zero captures while full-backup copy explicitly includes wishlist savings.
 - Checked 320×844 and 390×844 responsive layouts, keyboard tab navigation, native progress semantics, and browser console logs with no errors or warnings.
+- Rechecked Today, expanded Capture, populated Business, expanded Activity filters, Wishlist, and Export at 320, 375, 390, and 430 px; document, body, and main widths always matched the viewport.
+- Confirmed every built-in selection chip is visible and at least 44 px tall, the three Library tabs are 48 px tall, and long user-created Location values wrap inside their pills.
+- Simulated a 34 px iPhone bottom inset: the navigation became 103 px including its border and inset while its control row remained 68 px; main content retained 122 px of bottom clearance.
+- Verified the Export selector regression is repaired: the checkbox is 20×20 px, its adjacent label keeps usable width, and the complete selection row is the touch target.
+- Exercised capture, Library tab switching, Export selection, unknown-route recovery, service-worker notice dismissal, and production console logs with no errors.
 
 ## Privacy and security audit
 
@@ -77,4 +85,4 @@
 
 ## Recommended next action
 
-**After publishing approval, deploy the update and test the installed PWA on a real phone.** Confirm the existing local data survives the update, add one wishlist item, download a full backup, and verify an offline reload.
+**After publishing approval, deploy the release candidate and test the installed PWA on a real phone.** Confirm the navigation and wrapped choices in standalone mode, verify existing local data survives the update, download a full backup, and test an offline reload.

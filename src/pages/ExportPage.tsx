@@ -35,6 +35,7 @@ export const ExportPage: React.FC = () => {
     records,
     wishlistItems,
     drawHistory,
+    loading: dataLoading,
     saveCapture,
     clearAll,
     refresh,
@@ -412,6 +413,17 @@ export const ExportPage: React.FC = () => {
   const unprocessedCount = businessCaptures.filter((c) => c.handoffState === 'unprocessed').length;
   const exportedCount = businessCaptures.filter((c) => c.handoffState === 'exported').length;
   const processedCount = businessCaptures.filter((c) => c.handoffState === 'processed').length;
+
+  if (dataLoading) {
+    return (
+      <div className="page-container">
+        <h1 style={{ marginBottom: '24px' }}>Export &amp; Backup</h1>
+        <div className="empty-state" role="status">
+          <p>Loading your export data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-container">

@@ -170,7 +170,7 @@ describe('validateBackup', () => {
 
     expect(backup).toMatchObject({
       schemaVersion: '1.1',
-      appVersion: '1.1.0',
+      appVersion: '1.2.1',
       records,
       drawHistory,
       wishlistItems,

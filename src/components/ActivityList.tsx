@@ -21,6 +21,7 @@ import {
   Save,
   X,
   Sparkles,
+  SlidersHorizontal,
   Clock,
   Zap,
 } from 'lucide-react';
@@ -104,6 +105,27 @@ function moodLabel(m: MoodTag): string {
   }
 }
 
+function typeLabel(type: Exclude<CaptureType, 'business'>): string {
+  switch (type) {
+    case 'hobby': return 'Hobby';
+    case 'diy': return 'DIY project';
+    case 'ai-project': return 'AI project';
+    case 'learning': return 'Learning';
+    case 'other': return 'Other';
+  }
+}
+
+function costLabel(cost: NonNullable<Activity['costBand']>): string {
+  switch (cost) {
+    case 'free': return 'Free';
+    case 'under_10': return 'Under €10';
+    case 'under_50': return 'Under €50';
+    case 'under_100': return 'Under €100';
+    case 'over_100': return 'Over €100';
+    case 'unknown': return 'Unknown';
+  }
+}
+
 interface ActivityListProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -112,6 +134,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
   const { activities, saveAct } = useAppData();
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<ActivityFilters>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Activity | null>(null);
   const closeEditor = useCallback(() => setEditing(null), []);
@@ -162,6 +185,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
   );
 
   const hasFilters = Object.keys(filters).length > 0;
+  const activeFilterCount = Object.keys(filters).length;
 
   const clearFilters = useCallback(() => setFilters({}), []);
 
@@ -227,60 +251,78 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
         placeholder="Search by title, notes, or tags..."
       />
 
-      <div style={{ marginBottom: 12 }}>
-        <FilterRow
-          label="Type"
-          items={ACTIVITY_TYPES.map((t) => ({ key: t, label: t }))}
-          activeKey={filters.type}
-          onSelect={(v) => toggleFilter('type', v)}
-        />
-        <FilterRow
-          label="Status"
-          items={ACTIVITY_STATUSES.map((s) => ({ key: s, label: s.replace(/_/g, ' ') }))}
-          activeKey={filters.status}
-          onSelect={(v) => toggleFilter('status', v as ActivityStatus)}
-        />
-        <FilterRow
-          label="Energy"
-          items={ENERGY_LEVELS.map((e) => ({ key: e, label: energyLabel(e) }))}
-          activeKey={filters.energy}
-          onSelect={(v) => toggleFilter('energy', v as EnergyLevel)}
-        />
-        <FilterRow
-          label="Time"
-          items={TIME_ESTIMATES.map((t) => ({ key: t, label: timeLabel(t) }))}
-          activeKey={filters.time}
-          onSelect={(v) => toggleFilter('time', v as TimeEstimate)}
-        />
-        <FilterRow
-          label="Mood"
-          items={MOOD_TAGS.map((m) => ({ key: m, label: moodLabel(m) }))}
-          activeKey={filters.mood}
-          onSelect={(v) => toggleFilter('mood', v as MoodTag)}
-        />
-        <FilterRow
-          label="Materials"
-          items={MATERIALS_OPTIONS.map((m) => ({ key: m, label: m }))}
-          activeKey={filters.materialsReady}
-          onSelect={(v) => toggleFilter('materialsReady', v as MaterialsReady)}
-        />
-        {locations.length > 0 && (
-          <FilterRow
-            label="Location"
-            items={locations.map((l) => ({ key: l, label: l }))}
-            activeKey={filters.location}
-            onSelect={(v) => toggleFilter('location', v)}
-          />
-        )}
-        {hasFilters && (
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={clearFilters}
-            aria-label="Clear all filters"
-            style={{ marginTop: 8 }}
-          >
-            Clear all filters
-          </button>
+      <div className="activity-filter-shell">
+        <button
+          type="button"
+          className="btn btn-secondary btn-block activity-filter-toggle"
+          aria-expanded={filtersOpen}
+          aria-controls="activity-filter-panel"
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <SlidersHorizontal size={17} aria-hidden="true" />
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </span>
+          {filtersOpen ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+        </button>
+
+        {filtersOpen && (
+          <div id="activity-filter-panel" className="activity-filter-panel">
+            <FilterRow
+              label="Type"
+              items={ACTIVITY_TYPES.map((t) => ({ key: t, label: typeLabel(t) }))}
+              activeKey={filters.type}
+              onSelect={(v) => toggleFilter('type', v)}
+            />
+            <FilterRow
+              label="Status"
+              items={ACTIVITY_STATUSES.map((s) => ({ key: s, label: s.replace(/_/g, ' ') }))}
+              activeKey={filters.status}
+              onSelect={(v) => toggleFilter('status', v as ActivityStatus)}
+            />
+            <FilterRow
+              label="Energy"
+              items={ENERGY_LEVELS.map((e) => ({ key: e, label: energyLabel(e) }))}
+              activeKey={filters.energy}
+              onSelect={(v) => toggleFilter('energy', v as EnergyLevel)}
+            />
+            <FilterRow
+              label="Time"
+              items={TIME_ESTIMATES.map((t) => ({ key: t, label: timeLabel(t) }))}
+              activeKey={filters.time}
+              onSelect={(v) => toggleFilter('time', v as TimeEstimate)}
+            />
+            <FilterRow
+              label="Mood"
+              items={MOOD_TAGS.map((m) => ({ key: m, label: moodLabel(m) }))}
+              activeKey={filters.mood}
+              onSelect={(v) => toggleFilter('mood', v as MoodTag)}
+            />
+            <FilterRow
+              label="Materials"
+              items={MATERIALS_OPTIONS.map((m) => ({ key: m, label: m.toUpperCase() }))}
+              activeKey={filters.materialsReady}
+              onSelect={(v) => toggleFilter('materialsReady', v as MaterialsReady)}
+            />
+            {locations.length > 0 && (
+              <FilterRow
+                label="Location"
+                items={locations.map((l) => ({ key: l, label: l }))}
+                activeKey={filters.location}
+                onSelect={(v) => toggleFilter('location', v)}
+              />
+            )}
+            {hasFilters && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={clearFilters}
+                aria-label="Clear all filters"
+                style={{ marginTop: 12 }}
+              >
+                Clear all filters
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -329,7 +371,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
                       className="badge"
                       style={{ background: 'var(--color-accent-soft)', color: '#7a4a2a' }}
                     >
-                      {activity.type}
+                      {typeLabel(activity.type)}
                     </span>
                     <span className={`badge ${badgeClass(activity.status)}`}>
                       {activity.status.replace(/_/g, ' ')}
@@ -389,7 +431,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
               >
                 <DetailGrid>
                   <DetailItem label="Title" value={activity.title} />
-                  <DetailItem label="Type" value={activity.type} />
+                  <DetailItem label="Type" value={typeLabel(activity.type)} />
                   <DetailItem label="Status" value={activity.status.replace(/_/g, ' ')} />
                   {activity.notes && <DetailItem label="Notes" value={activity.notes} />}
                   {activity.estimatedTime && (
@@ -402,7 +444,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
                     <DetailItem label="Location" value={activity.location} />
                   )}
                   {activity.costBand && (
-                    <DetailItem label="Cost" value={activity.costBand} />
+                    <DetailItem label="Cost" value={costLabel(activity.costBand)} />
                   )}
                   {activity.materialsNeeded && (
                     <DetailItem label="Materials needed" value={activity.materialsNeeded} />
@@ -524,7 +566,7 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
                 >
                   {ACTIVITY_TYPES.map((t) => (
                     <option key={t} value={t}>
-                      {t}
+                      {typeLabel(t)}
                     </option>
                   ))}
                 </select>
@@ -614,10 +656,10 @@ export const ActivityList: React.FC<ActivityListProps> = ({ showToast }) => {
                 >
                   <option value="">—</option>
                   <option value="free">Free</option>
-                  <option value="under_10">Under $10</option>
-                  <option value="under_50">Under $50</option>
-                  <option value="under_100">Under $100</option>
-                  <option value="over_100">Over $100</option>
+                  <option value="under_10">Under €10</option>
+                  <option value="under_50">Under €50</option>
+                  <option value="under_100">Under €100</option>
+                  <option value="over_100">Over €100</option>
                   <option value="unknown">Unknown</option>
                 </select>
               </div>
@@ -729,18 +771,8 @@ function FilterRow({
 }) {
   if (items.length === 0) return null;
   return (
-    <div style={{ marginBottom: 8 }}>
-      <span
-        style={{
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: 'var(--color-text-tertiary)',
-          display: 'block',
-          marginBottom: 4,
-        }}
-      >
+    <div className="activity-filter-row">
+      <span className="activity-filter-label">
         {label}
       </span>
       <div className="filter-bar" role="group" aria-label={`Filter by ${label}`}>

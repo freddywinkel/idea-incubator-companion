@@ -53,10 +53,10 @@ const ENERGY_LEVELS: { value: EnergyLevel; label: string }[] = [
 
 const COST_BANDS: { value: CostBand; label: string }[] = [
   { value: 'free', label: 'Free' },
-  { value: 'under_10', label: '< $10' },
-  { value: 'under_50', label: '< $50' },
-  { value: 'under_100', label: '< $100' },
-  { value: 'over_100', label: '$100+' },
+  { value: 'under_10', label: '< €10' },
+  { value: 'under_50', label: '< €50' },
+  { value: 'under_100', label: '< €100' },
+  { value: 'over_100', label: '€100+' },
   { value: 'unknown', label: 'Unknown' },
 ];
 
@@ -80,6 +80,33 @@ function isHttpUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function handleRadioKeyDown<T extends string>(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  values: T[],
+  current: T | '',
+  onSelect: (value: T) => void
+) {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+
+  const currentIndex = Math.max(0, values.indexOf(current as T));
+  let nextIndex = currentIndex;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    nextIndex = (currentIndex - 1 + values.length) % values.length;
+  }
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    nextIndex = (currentIndex + 1) % values.length;
+  }
+  if (event.key === 'Home') nextIndex = 0;
+  if (event.key === 'End') nextIndex = values.length - 1;
+
+  onSelect(values[nextIndex]);
+  const group = event.currentTarget.closest('[role="radiogroup"]');
+  window.requestAnimationFrame(() => {
+    group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[nextIndex]?.focus();
+  });
 }
 
 export const CapturePage: React.FC = () => {
@@ -300,7 +327,7 @@ export const CapturePage: React.FC = () => {
 
   return (
     <div className="page-container">
-      <h1 className="section-title" style={{ marginBottom: 24 }}>
+      <h1 style={{ marginBottom: 24 }}>
         Capture
       </h1>
 
@@ -328,11 +355,11 @@ export const CapturePage: React.FC = () => {
 
         {/* Type selector */}
         <div className="form-group">
-          <label style={{ marginBottom: 8, display: 'block' }}>Type</label>
+          <div className="field-label" id="capture-type-label">Type</div>
           <div
             className="filter-bar"
             role="radiogroup"
-            aria-label="Capture type"
+            aria-labelledby="capture-type-label"
           >
             {CAPTURE_TYPES.map(({ type, label }) => (
               <button
@@ -341,8 +368,15 @@ export const CapturePage: React.FC = () => {
                 role="radio"
                 aria-checked={captureType === type}
                 aria-label={label}
+                tabIndex={captureType === type ? 0 : -1}
                 className={`chip ${captureType === type ? 'active' : ''}`}
                 onClick={() => setCaptureType(type)}
+                onKeyDown={(event) => handleRadioKeyDown(
+                  event,
+                  CAPTURE_TYPES.map((option) => option.type),
+                  captureType,
+                  setCaptureType
+                )}
               >
                 {label}
               </button>
@@ -631,11 +665,11 @@ export const CapturePage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Mood</label>
+                  <div className="field-label" id="capture-mood-label">Mood</div>
                   <div
                     className="filter-bar"
                     role="group"
-                    aria-label="Mood tags"
+                    aria-labelledby="capture-mood-label"
                   >
                     {MOOD_TAGS.map(({ value, label }) => (
                       <button
@@ -653,20 +687,27 @@ export const CapturePage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Estimated time</label>
+                  <div className="field-label" id="capture-time-label">Estimated time</div>
                   <div
                     className="filter-bar"
                     role="radiogroup"
-                    aria-label="Estimated time"
+                    aria-labelledby="capture-time-label"
                   >
-                    {TIME_ESTIMATES.map(({ value, label }) => (
+                    {TIME_ESTIMATES.map(({ value, label }, index) => (
                       <button
                         key={value}
                         type="button"
                         role="radio"
                         aria-checked={estimatedTime === value}
+                        tabIndex={estimatedTime === value || (!estimatedTime && index === 0) ? 0 : -1}
                         className={`chip ${estimatedTime === value ? 'active' : ''}`}
                         onClick={() => setEstimatedTime(value)}
+                        onKeyDown={(event) => handleRadioKeyDown(
+                          event,
+                          TIME_ESTIMATES.map((option) => option.value),
+                          estimatedTime,
+                          setEstimatedTime
+                        )}
                         aria-label={label}
                       >
                         {label}
@@ -676,20 +717,27 @@ export const CapturePage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Energy</label>
+                  <div className="field-label" id="capture-energy-label">Energy</div>
                   <div
                     className="filter-bar"
                     role="radiogroup"
-                    aria-label="Energy level"
+                    aria-labelledby="capture-energy-label"
                   >
-                    {ENERGY_LEVELS.map(({ value, label }) => (
+                    {ENERGY_LEVELS.map(({ value, label }, index) => (
                       <button
                         key={value}
                         type="button"
                         role="radio"
                         aria-checked={energy === value}
+                        tabIndex={energy === value || (!energy && index === 0) ? 0 : -1}
                         className={`chip ${energy === value ? 'active' : ''}`}
                         onClick={() => setEnergy(value)}
+                        onKeyDown={(event) => handleRadioKeyDown(
+                          event,
+                          ENERGY_LEVELS.map((option) => option.value),
+                          energy,
+                          setEnergy
+                        )}
                         aria-label={label}
                       >
                         {label}
@@ -710,20 +758,27 @@ export const CapturePage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Cost band</label>
+                  <div className="field-label" id="capture-cost-label">Cost band</div>
                   <div
                     className="filter-bar"
                     role="radiogroup"
-                    aria-label="Cost band"
+                    aria-labelledby="capture-cost-label"
                   >
-                    {COST_BANDS.map(({ value, label }) => (
+                    {COST_BANDS.map(({ value, label }, index) => (
                       <button
                         key={value}
                         type="button"
                         role="radio"
                         aria-checked={costBand === value}
+                        tabIndex={costBand === value || (!costBand && index === 0) ? 0 : -1}
                         className={`chip ${costBand === value ? 'active' : ''}`}
                         onClick={() => setCostBand(value)}
+                        onKeyDown={(event) => handleRadioKeyDown(
+                          event,
+                          COST_BANDS.map((option) => option.value),
+                          costBand,
+                          setCostBand
+                        )}
                         aria-label={label}
                       >
                         {label}
@@ -744,20 +799,27 @@ export const CapturePage: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Materials ready</label>
+                  <div className="field-label" id="capture-materials-label">Materials ready</div>
                   <div
                     className="filter-bar"
                     role="radiogroup"
-                    aria-label="Materials ready"
+                    aria-labelledby="capture-materials-label"
                   >
-                    {MATERIALS_READY_OPTIONS.map(({ value, label }) => (
+                    {MATERIALS_READY_OPTIONS.map(({ value, label }, index) => (
                       <button
                         key={value}
                         type="button"
                         role="radio"
                         aria-checked={materialsReady === value}
+                        tabIndex={materialsReady === value || (!materialsReady && index === 0) ? 0 : -1}
                         className={`chip ${materialsReady === value ? 'active' : ''}`}
                         onClick={() => setMaterialsReady(value)}
+                        onKeyDown={(event) => handleRadioKeyDown(
+                          event,
+                          MATERIALS_READY_OPTIONS.map((option) => option.value),
+                          materialsReady,
+                          setMaterialsReady
+                        )}
                         aria-label={label}
                       >
                         {label}

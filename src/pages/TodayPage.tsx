@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sun, Clock, Zap, Heart, RefreshCw, Check, X, Play, ArrowDown, Sparkles } from 'lucide-react';
 import { useAppData } from '../hooks/useAppData';
 import { useToast } from '../hooks/useToast';
@@ -30,7 +30,7 @@ const moodOptions: { value: MoodTag | 'surprise'; label: string }[] = [
 ];
 
 export const TodayPage: React.FC = () => {
-  const { activities, drawHistory, saveAct, addHistory } = useAppData();
+  const { activities, drawHistory, loading: dataLoading, saveAct, addHistory } = useAppData();
   const { showToast } = useToast();
   const [criteria, setCriteria] = useState<PickerCriteria>({
     time: 'surprise',
@@ -46,6 +46,23 @@ export const TodayPage: React.FC = () => {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSmaller, setShowSmaller] = useState(false);
+  const outcomeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!result && !noMatch) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const outcome = outcomeRef.current;
+      if (!outcome) return;
+      outcome.focus({ preventScroll: true });
+      outcome.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [result, noMatch]);
 
   const runPick = useCallback(async (activeCriteria: PickerCriteria) => {
     setLoading(true);
@@ -175,9 +192,28 @@ export const TodayPage: React.FC = () => {
 
   const activeCount = activities.filter(a => a.status === 'available').length;
 
+  if (dataLoading) {
+    return (
+      <div className="page-container">
+        <div className="today-page-header">
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <Sun size={28} color="var(--color-accent)" aria-hidden="true" />
+            Today
+          </h1>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>
+            Let your Activity Jar suggest one thing to do now.
+          </p>
+        </div>
+        <div className="empty-state" role="status">
+          <p>Loading your Activity Jar...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-container">
-      <div style={{ marginBottom: 24 }}>
+      <div className="today-page-header">
         <h1 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <Sun size={28} color="var(--color-accent)" aria-hidden="true" />
           Today
@@ -188,7 +224,7 @@ export const TodayPage: React.FC = () => {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div className="today-availability-row">
           <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
             {activeCount} {activeCount === 1 ? 'activity' : 'activities'} available
           </span>
@@ -204,11 +240,11 @@ export const TodayPage: React.FC = () => {
 
         {/* Time filter */}
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div id="today-time-label" className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Clock size={16} aria-hidden="true" />
             Available time
-          </label>
-          <div className="filter-bar">
+          </div>
+          <div className="filter-bar" role="group" aria-labelledby="today-time-label">
             {timeOptions.map((opt) => (
               <button
                 key={opt.value}
@@ -224,11 +260,11 @@ export const TodayPage: React.FC = () => {
 
         {/* Energy filter */}
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div id="today-energy-label" className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Zap size={16} aria-hidden="true" />
             Energy
-          </label>
-          <div className="filter-bar">
+          </div>
+          <div className="filter-bar" role="group" aria-labelledby="today-energy-label">
             {energyOptions.map((opt) => (
               <button
                 key={opt.value}
@@ -244,11 +280,11 @@ export const TodayPage: React.FC = () => {
 
         {/* Mood filter */}
         <div className="form-group">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div id="today-mood-label" className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Heart size={16} aria-hidden="true" />
             Mood
-          </label>
-          <div className="filter-bar">
+          </div>
+          <div className="filter-bar" role="group" aria-labelledby="today-mood-label">
             {moodOptions.map((opt) => (
               <button
                 key={opt.value}
@@ -263,18 +299,17 @@ export const TodayPage: React.FC = () => {
         </div>
 
         {/* Strict mood toggle */}
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <label className="form-group toggle-row" htmlFor="strict-mood">
           <input
             id="strict-mood"
             type="checkbox"
             checked={criteria.strictMood}
             onChange={(e) => setCriteria((c) => ({ ...c, strictMood: e.target.checked }))}
-            style={{ width: 20, height: 20, minHeight: 20, cursor: 'pointer' }}
           />
-          <label htmlFor="strict-mood" style={{ marginBottom: 0, cursor: 'pointer' }}>
+          <span>
             Mood is a strict filter
-          </label>
-        </div>
+          </span>
+        </label>
 
         <button
           className="btn btn-primary btn-block"
@@ -288,11 +323,17 @@ export const TodayPage: React.FC = () => {
 
       {/* Result card */}
       {result && (
-        <div className="card" style={{ marginBottom: 16, borderColor: 'var(--color-accent-soft)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+        <div
+          ref={outcomeRef}
+          className="card picker-outcome"
+          tabIndex={-1}
+          aria-live="polite"
+          style={{ marginBottom: 16, borderColor: 'var(--color-accent-soft)' }}
+        >
+          <div className="today-result-header">
             <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>{result.title}</h2>
             {relaxed && (
-              <span className="badge" style={{ background: 'var(--color-warning)', color: '#7a5c1a', fontSize: '0.7rem' }}>
+              <span className="badge badge-closest-match">
                 Closest match
               </span>
             )}
@@ -306,18 +347,18 @@ export const TodayPage: React.FC = () => {
             {result.estimatedTime && (
               <span className="chip" style={{ cursor: 'default' }}>
                 <Clock size={14} />
-                {result.estimatedTime}
+                {timeOptions.find((option) => option.value === result.estimatedTime)?.label || result.estimatedTime}
               </span>
             )}
             {result.energy && (
               <span className="chip" style={{ cursor: 'default' }}>
                 <Zap size={14} />
-                {result.energy}
+                {energyOptions.find((option) => option.value === result.energy)?.label || result.energy}
               </span>
             )}
             {result.moodTags.map((m) => (
               <span key={m} className="chip active" style={{ cursor: 'default', fontSize: '0.75rem' }}>
-                {m.replace('_', ' / ')}
+                {moodOptions.find((option) => option.value === m)?.label || m}
               </span>
             ))}
           </div>
@@ -368,7 +409,13 @@ export const TodayPage: React.FC = () => {
 
       {/* No match state */}
       {noMatch && !result && (
-        <div className="card empty-state" style={{ alignItems: 'flex-start', textAlign: 'left' }}>
+        <div
+          ref={outcomeRef}
+          className="card empty-state picker-outcome"
+          tabIndex={-1}
+          aria-live="polite"
+          style={{ alignItems: 'flex-start', textAlign: 'left' }}
+        >
           <p style={{ color: 'var(--color-text-secondary)', marginBottom: 16 }}>
             {reason}
           </p>

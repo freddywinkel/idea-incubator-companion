@@ -53,25 +53,28 @@ export const AppDataProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [biz, acts, hist, wishes] = await Promise.all([
-        getAllBusinessCaptures(),
-        getAllActivities(),
-        getDrawHistory(),
-        getAllWishlistItems(),
-      ]);
-      setBusinessCaptures(biz);
-      setActivities(acts);
-      setDrawHistory(hist);
-      setWishlistItems(wishes);
-    } finally {
-      setLoading(false);
-    }
+    const [biz, acts, hist, wishes] = await Promise.all([
+      getAllBusinessCaptures(),
+      getAllActivities(),
+      getDrawHistory(),
+      getAllWishlistItems(),
+    ]);
+    setBusinessCaptures(biz);
+    setActivities(acts);
+    setDrawHistory(hist);
+    setWishlistItems(wishes);
   }, []);
 
   useEffect(() => {
-    refresh();
+    let mounted = true;
+    refresh()
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [refresh]);
 
   const saveCapture = useCallback(async (capture: BusinessCapture) => {
