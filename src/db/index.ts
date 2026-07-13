@@ -1,8 +1,15 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { BusinessCapture, Activity, DrawHistoryEntry, RecordItem } from '../types';
+import type {
+  BusinessCapture,
+  Activity,
+  DrawHistoryEntry,
+  RecordItem,
+  WishlistItem,
+  WishlistStatus,
+} from '../types';
 
 const DB_NAME = 'IdeaJarDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface IdeaJarSchema extends DBSchema {
   businessCaptures: {
@@ -31,6 +38,14 @@ interface IdeaJarSchema extends DBSchema {
       'by-drawnAt': string;
     };
   };
+  wishlistItems: {
+    key: string;
+    value: WishlistItem;
+    indexes: {
+      'by-status': WishlistStatus;
+      'by-createdAt': string;
+    };
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<IdeaJarSchema>> | null = null;
@@ -53,6 +68,12 @@ export function getDB(): Promise<IDBPDatabase<IdeaJarSchema>> {
         const histStore = db.createObjectStore('drawHistory', { keyPath: 'id' });
         histStore.createIndex('by-activityId', 'activityId', { unique: false });
         histStore.createIndex('by-drawnAt', 'drawnAt', { unique: false });
+      }
+
+      if (oldVersion < 2) {
+        const wishlistStore = db.createObjectStore('wishlistItems', { keyPath: 'id' });
+        wishlistStore.createIndex('by-status', 'status', { unique: false });
+        wishlistStore.createIndex('by-createdAt', 'createdAt', { unique: false });
       }
     },
   });
@@ -121,6 +142,26 @@ export async function addDrawHistory(entry: DrawHistoryEntry): Promise<void> {
   await db.put('drawHistory', entry);
 }
 
+export async function getAllWishlistItems(): Promise<WishlistItem[]> {
+  const db = await getDB();
+  return db.getAll('wishlistItems');
+}
+
+export async function getWishlistItemById(id: string): Promise<WishlistItem | undefined> {
+  const db = await getDB();
+  return db.get('wishlistItems', id);
+}
+
+export async function saveWishlistItem(item: WishlistItem): Promise<void> {
+  const db = await getDB();
+  await db.put('wishlistItems', item);
+}
+
+export async function deleteWishlistItem(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('wishlistItems', id);
+}
+
 export async function getNextLocalId(): Promise<string> {
   const captures = await getAllBusinessCaptures();
   const date = new Date();
@@ -149,11 +190,12 @@ export async function getAllRecords(): Promise<RecordItem[]> {
 
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(['businessCaptures', 'activities', 'drawHistory'], 'readwrite');
+  const tx = db.transaction(['businessCaptures', 'activities', 'drawHistory', 'wishlistItems'], 'readwrite');
   await Promise.all([
     tx.objectStore('businessCaptures').clear(),
     tx.objectStore('activities').clear(),
     tx.objectStore('drawHistory').clear(),
+    tx.objectStore('wishlistItems').clear(),
   ]);
   await tx.done;
 }

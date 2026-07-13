@@ -1,11 +1,13 @@
 import React from 'react';
-import { isBusinessCapture } from '../types';
-import type { ImportDiff } from '../types';
+import type { BackupImportDiff, RecordItem, WishlistItem } from '../types';
 import { X, RotateCcw, Database, TriangleAlert } from 'lucide-react';
 import { useModalFocus } from '../hooks/useModalFocus';
 
 interface ImportPreviewModalProps {
-  diff: ImportDiff;
+  diff: BackupImportDiff;
+  historyAdditionCount: number;
+  legacyWithoutWishlist: boolean;
+  currentWishlistCount: number;
   onMerge: () => void;
   onReplace: () => void;
   onCancel: () => void;
@@ -14,18 +16,37 @@ interface ImportPreviewModalProps {
 
 export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
   diff,
+  historyAdditionCount,
+  legacyWithoutWishlist,
+  currentWishlistCount,
   onMerge,
   onReplace,
   onCancel,
   importing,
 }) => {
-  const total = diff.additions.length + diff.updates.length + diff.conflicts.length + diff.unchanged.length;
+  const additions: Array<RecordItem | WishlistItem> = [
+    ...diff.records.additions,
+    ...diff.wishlistItems.additions,
+  ];
+  const updatedItems: Array<RecordItem | WishlistItem> = [
+    ...diff.records.updates.map(({ updated }) => updated),
+    ...diff.wishlistItems.updates.map(({ updated }) => updated),
+  ];
+  const conflictCount = diff.records.conflicts.length + diff.wishlistItems.conflicts.length;
+  const unchangedCount = diff.records.unchanged.length + diff.wishlistItems.unchanged.length;
+  const wishlistTotal =
+    diff.wishlistItems.additions.length +
+    diff.wishlistItems.updates.length +
+    diff.wishlistItems.conflicts.length +
+    diff.wishlistItems.unchanged.length;
+  const total = additions.length + updatedItems.length + conflictCount + unchangedCount;
+  const hasMergeChanges = additions.length > 0 || updatedItems.length > 0 || historyAdditionCount > 0;
   const dialogRef = useModalFocus(true, () => {
     if (!importing) onCancel();
   });
 
-  const getItemLabel = (item: ImportDiff['additions'][number]) => {
-    if (isBusinessCapture(item)) return item.localId;
+  const getItemLabel = (item: RecordItem | WishlistItem) => {
+    if (item.type === 'business') return item.localId;
     return item.title;
   };
 
@@ -43,7 +64,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
           Import Preview
         </h2>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', marginBottom: '16px' }}>
-          {total} item(s) found in backup. Choose how to import them.
+          {total} item(s) found in backup, including {wishlistTotal} wishlist item(s). Choose how to import them.
         </p>
 
         <div style={{ display: 'grid', gap: '8px', marginBottom: '20px' }}>
@@ -58,7 +79,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
             }}
           >
             <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#166534' }}>New additions</span>
-            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#166534' }}>{diff.additions.length}</span>
+            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#166534' }}>{additions.length}</span>
           </div>
           <div
             style={{
@@ -73,7 +94,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
             <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#1e40af' }}>
               Updates (incoming is newer)
             </span>
-            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1e40af' }}>{diff.updates.length}</span>
+            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1e40af' }}>{updatedItems.length}</span>
           </div>
           <div
             style={{
@@ -86,7 +107,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
             }}
           >
             <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#92400e' }}>Conflicts (same age)</span>
-            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#92400e' }}>{diff.conflicts.length}</span>
+            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#92400e' }}>{conflictCount}</span>
           </div>
           <div
             style={{
@@ -103,13 +124,13 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
               Unchanged
             </span>
             <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-              {diff.unchanged.length}
+              {unchangedCount}
             </span>
           </div>
         </div>
 
         {/* Summary preview */}
-        {diff.additions.length > 0 && (
+        {additions.length > 0 && (
           <div style={{ marginBottom: '12px' }}>
             <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '6px' }}>New additions preview</h3>
             <div
@@ -120,17 +141,17 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {diff.additions.slice(0, 5).map((item) => (
+              {additions.slice(0, 5).map((item) => (
                 <div key={item.id} style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
                   {getItemLabel(item)} · {item.type}
                 </div>
               ))}
-              {diff.additions.length > 5 && <div>+ {diff.additions.length - 5} more</div>}
+              {additions.length > 5 && <div>+ {additions.length - 5} more</div>}
             </div>
           </div>
         )}
 
-        {diff.updates.length > 0 && (
+        {updatedItems.length > 0 && (
           <div style={{ marginBottom: '12px' }}>
             <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '6px' }}>Updates preview</h3>
             <div
@@ -141,17 +162,17 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
                 color: 'var(--color-text-secondary)',
               }}
             >
-              {diff.updates.slice(0, 5).map(({ updated }) => (
+              {updatedItems.slice(0, 5).map((updated) => (
                 <div key={updated.id} style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
                   {getItemLabel(updated)} · {updated.type}
                 </div>
               ))}
-              {diff.updates.length > 5 && <div>+ {diff.updates.length - 5} more</div>}
+              {updatedItems.length > 5 && <div>+ {updatedItems.length - 5} more</div>}
             </div>
           </div>
         )}
 
-        {diff.conflicts.length > 0 && (
+        {conflictCount > 0 && (
           <div
             style={{
               marginBottom: '12px',
@@ -163,7 +184,30 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
             }}
           >
             <TriangleAlert size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-            {diff.conflicts.length} conflict(s) will keep current data (incoming is same age or older).
+            {conflictCount} conflict(s) will keep current data (incoming is same age or older).
+          </div>
+        )}
+
+        {historyAdditionCount > 0 && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginBottom: '12px' }}>
+            {historyAdditionCount} missing draw history event(s) can also be merged.
+          </p>
+        )}
+
+        {legacyWithoutWishlist && currentWishlistCount > 0 && (
+          <div
+            style={{
+              marginBottom: '12px',
+              padding: '10px',
+              background: '#fef3c7',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.75rem',
+              color: '#92400e',
+            }}
+          >
+            <TriangleAlert size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+            This older backup has no wishlist data. Merge keeps your current wishlist; Replace all clears its{' '}
+            {currentWishlistCount} item(s).
           </div>
         )}
 
@@ -171,7 +215,7 @@ export const ImportPreviewModal: React.FC<ImportPreviewModalProps> = ({
           <button
             className="btn btn-primary btn-block"
             onClick={onMerge}
-            disabled={importing || (diff.additions.length === 0 && diff.updates.length === 0)}
+            disabled={importing || !hasMergeChanges}
             aria-label="Merge backup data with current data"
           >
             <Database size={18} />

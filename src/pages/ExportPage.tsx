@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { useToast } from '../hooks/useToast';
 import { isBusinessCapture } from '../types';
-import type { BusinessCapture, ProcessingResult, AppBackup, ImportDiff } from '../types';
+import type { BusinessCapture, ProcessingResult, AppBackup, BackupImportDiff } from '../types';
 import {
   buildMarkdownExport,
   buildBatchJSON,
@@ -30,7 +30,15 @@ import {
 import { ImportPreviewModal } from '../components/ImportPreviewModal';
 
 export const ExportPage: React.FC = () => {
-  const { businessCaptures, records, drawHistory, saveCapture, clearAll, refresh } = useAppData();
+  const {
+    businessCaptures,
+    records,
+    wishlistItems,
+    drawHistory,
+    saveCapture,
+    clearAll,
+    refresh,
+  } = useAppData();
   const { showToast } = useToast();
 
   // Selected captures for export
@@ -46,7 +54,7 @@ export const ExportPage: React.FC = () => {
   const processingFileInputRef = useRef<HTMLInputElement>(null);
 
   // Backup & restore
-  const [backupDiff, setBackupDiff] = useState<ImportDiff | null>(null);
+  const [backupDiff, setBackupDiff] = useState<BackupImportDiff | null>(null);
   const [backupImportData, setBackupImportData] = useState<AppBackup | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -237,7 +245,7 @@ export const ExportPage: React.FC = () => {
   // Backup
   const handleDownloadBackup = () => {
     try {
-      const backup = buildAppBackup(records, drawHistory);
+      const backup = buildAppBackup({ records, drawHistory, wishlistItems });
       const dateStr = getExportDateStr();
       downloadJSON(`${dateStr}-idea-jar-backup.json`, backup);
       showToast('Backup downloaded', 'success');
@@ -263,7 +271,10 @@ export const ExportPage: React.FC = () => {
           showToast('Invalid or unsupported backup file', 'error');
           return;
         }
-        const diff = computeImportDiff(records, backup.records);
+        const diff: BackupImportDiff = {
+          records: computeImportDiff(records, backup.records),
+          wishlistItems: computeImportDiff(wishlistItems, backup.wishlistItems),
+        };
         setBackupDiff(diff);
         setBackupImportData(backup);
         setShowImportModal(true);
@@ -281,21 +292,30 @@ export const ExportPage: React.FC = () => {
     try {
       const db = await getDB();
       const historyAdditions = getDrawHistoryAdditions(drawHistory, backupImportData.drawHistory);
-      const tx = db.transaction(['businessCaptures', 'activities', 'drawHistory'], 'readwrite');
+      const tx = db.transaction(
+        ['businessCaptures', 'activities', 'drawHistory', 'wishlistItems'],
+        'readwrite'
+      );
       const promises: Promise<unknown>[] = [];
-      for (const addition of backupDiff.additions) {
+      for (const addition of backupDiff.records.additions) {
         if (isBusinessCapture(addition)) {
           promises.push(tx.objectStore('businessCaptures').put(addition));
         } else {
           promises.push(tx.objectStore('activities').put(addition));
         }
       }
-      for (const { updated } of backupDiff.updates) {
+      for (const { updated } of backupDiff.records.updates) {
         if (isBusinessCapture(updated)) {
           promises.push(tx.objectStore('businessCaptures').put(updated));
         } else {
           promises.push(tx.objectStore('activities').put(updated));
         }
+      }
+      for (const addition of backupDiff.wishlistItems.additions) {
+        promises.push(tx.objectStore('wishlistItems').put(addition));
+      }
+      for (const { updated } of backupDiff.wishlistItems.updates) {
+        promises.push(tx.objectStore('wishlistItems').put(updated));
       }
       for (const entry of historyAdditions) {
         promises.push(tx.objectStore('drawHistory').add(entry));
@@ -304,7 +324,7 @@ export const ExportPage: React.FC = () => {
       await tx.done;
       await refresh();
       showToast(
-        `Merged ${backupDiff.additions.length} addition(s), ${backupDiff.updates.length} update(s), and ${historyAdditions.length} draw history event(s)`,
+        `Merged ${backupDiff.records.additions.length + backupDiff.records.updates.length} idea/activity change(s), ${backupDiff.wishlistItems.additions.length + backupDiff.wishlistItems.updates.length} wishlist change(s), and ${historyAdditions.length} draw history event(s)`,
         'success'
       );
       setShowImportModal(false);
@@ -323,13 +343,16 @@ export const ExportPage: React.FC = () => {
     setImporting(true);
     try {
       const db = await getDB();
-      const tx = db.transaction(['businessCaptures', 'activities', 'drawHistory'], 'readwrite');
-      await Promise.all([
+      const tx = db.transaction(
+        ['businessCaptures', 'activities', 'drawHistory', 'wishlistItems'],
+        'readwrite'
+      );
+      const promises: Promise<unknown>[] = [
         tx.objectStore('businessCaptures').clear(),
         tx.objectStore('activities').clear(),
         tx.objectStore('drawHistory').clear(),
-      ]);
-      const promises: Promise<unknown>[] = [];
+        tx.objectStore('wishlistItems').clear(),
+      ];
       for (const record of backupImportData.records) {
         if (isBusinessCapture(record)) {
           promises.push(tx.objectStore('businessCaptures').put(record));
@@ -339,6 +362,9 @@ export const ExportPage: React.FC = () => {
       }
       for (const entry of backupImportData.drawHistory) {
         promises.push(tx.objectStore('drawHistory').put(entry));
+      }
+      for (const item of backupImportData.wishlistItems) {
+        promises.push(tx.objectStore('wishlistItems').put(item));
       }
       await Promise.all(promises);
       await tx.done;
@@ -679,7 +705,8 @@ export const ExportPage: React.FC = () => {
           }}
         >
           Your data lives in this browser profile. Clearing browser storage may erase it. GitHub hosts
-          the app code, not your data. Regular backups are recommended.
+          the app code, not your data. A full backup includes business captures, activities, wishlist
+          items, savings progress, and draw history. Regular backups are recommended.
         </p>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
           <button
@@ -798,6 +825,11 @@ export const ExportPage: React.FC = () => {
       {showImportModal && backupDiff && backupImportData && (
         <ImportPreviewModal
           diff={backupDiff}
+          historyAdditionCount={getDrawHistoryAdditions(drawHistory, backupImportData.drawHistory).length}
+          legacyWithoutWishlist={
+            backupImportData.schemaVersion === '1.0' && backupImportData.wishlistItems.length === 0
+          }
+          currentWishlistCount={wishlistItems.length}
           onMerge={handleMergeImport}
           onReplace={handleReplaceImport}
           onCancel={handleCancelImport}

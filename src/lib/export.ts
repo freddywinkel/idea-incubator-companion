@@ -6,6 +6,7 @@ import type {
   RecordItem,
   ImportDiff,
   DrawHistoryEntry,
+  WishlistItem,
 } from '../types';
 
 const PROCESSING_OUTCOMES = ['created', 'duplicate', 'variation', 'needs_clarification', 'error'] as const;
@@ -18,6 +19,7 @@ const MOOD_TAGS = ['create', 'learn', 'build_fix', 'relax', 'active', 'surprise'
 const MATERIALS_READY_VALUES = ['yes', 'no', 'n/a'] as const;
 const COST_BANDS = ['free', 'under_10', 'under_50', 'under_100', 'over_100', 'unknown'] as const;
 const DRAW_ACTIONS = ['started', 'snoozed', 'picked_another', 'done', 'made_smaller'] as const;
+const WISHLIST_STATUSES = ['active', 'bought', 'archived'] as const;
 const OFFICIAL_ID_PATTERN = /^IDEA-[0-9]{3,}$/;
 const LOCAL_CAPTURE_ID_PATTERN = /^CAP-[0-9]{8}-[0-9]{3,}$/;
 
@@ -63,14 +65,19 @@ export function buildBatchJSON(captures: BusinessCapture[]): BusinessExport {
   };
 }
 
-export function buildAppBackup(records: RecordItem[], drawHistory: unknown[]): AppBackup {
+export function buildAppBackup({
+  records,
+  drawHistory,
+  wishlistItems,
+}: Pick<AppBackup, 'records' | 'drawHistory' | 'wishlistItems'>): AppBackup {
   return {
-    schemaVersion: '1.0',
+    schemaVersion: '1.1',
     backupId: crypto.randomUUID?.() ?? `${Date.now()}`,
     exportedAt: new Date().toISOString(),
-    appVersion: '1.0.0',
+    appVersion: '1.1.0',
     records,
-    drawHistory: drawHistory as AppBackup['drawHistory'],
+    drawHistory,
+    wishlistItems,
   };
 }
 
@@ -101,12 +108,16 @@ export function validateProcessingResult(data: unknown): ProcessingResult | null
 export function validateBackup(data: unknown): AppBackup | null {
   if (!isObjectRecord(data)) return null;
   const d = data;
-  if (d.schemaVersion !== '1.0') return null;
+  if (d.schemaVersion !== '1.0' && d.schemaVersion !== '1.1') return null;
   if (!isNonEmptyString(d.backupId)) return null;
   if (!isIsoTimestamp(d.exportedAt)) return null;
   if (!isNonEmptyString(d.appVersion)) return null;
   if (!Array.isArray(d.records)) return null;
   if (!Array.isArray(d.drawHistory)) return null;
+  if (d.schemaVersion === '1.1' && !Array.isArray(d.wishlistItems)) return null;
+  if (d.wishlistItems !== undefined && !Array.isArray(d.wishlistItems)) return null;
+
+  const wishlistItems = d.wishlistItems ?? [];
 
   const recordIds = new Set<string>();
   const localCaptureIds = new Set<string>();
@@ -120,6 +131,13 @@ export function validateBackup(data: unknown): AppBackup | null {
     }
   }
 
+  const wishlistIds = new Set<string>();
+  for (const item of wishlistItems) {
+    if (!isValidWishlistItem(item)) return null;
+    if (recordIds.has(item.id) || wishlistIds.has(item.id)) return null;
+    wishlistIds.add(item.id);
+  }
+
   const historyIds = new Set<string>();
   for (const entry of d.drawHistory) {
     if (!isValidDrawHistoryEntry(entry)) return null;
@@ -127,7 +145,15 @@ export function validateBackup(data: unknown): AppBackup | null {
     historyIds.add(entry.id);
   }
 
-  return data as unknown as AppBackup;
+  return {
+    schemaVersion: d.schemaVersion,
+    backupId: d.backupId,
+    exportedAt: d.exportedAt,
+    appVersion: d.appVersion,
+    records: d.records as RecordItem[],
+    drawHistory: d.drawHistory as DrawHistoryEntry[],
+    wishlistItems: wishlistItems as WishlistItem[],
+  };
 }
 
 export function getDrawHistoryAdditions(
@@ -193,6 +219,21 @@ function isValidRecord(value: unknown): value is RecordItem {
   return true;
 }
 
+function isValidWishlistItem(value: unknown): value is WishlistItem {
+  if (!isObjectRecord(value)) return false;
+  if (!isNonEmptyString(value.id)) return false;
+  if (value.type !== 'wishlist') return false;
+  if (!isNonEmptyString(value.title)) return false;
+  if (!isOneOf(value.status, WISHLIST_STATUSES)) return false;
+  if (!isIsoTimestamp(value.createdAt) || !isIsoTimestamp(value.updatedAt)) return false;
+  if (!areOptionalStrings(value, ['notes'])) return false;
+  if (value.productUrl !== undefined && !isHttpUrl(value.productUrl)) return false;
+  if (!isNonNegativeInteger(value.savedAmountCents)) return false;
+  if (value.targetPriceCents !== undefined && !isNonNegativeInteger(value.targetPriceCents)) return false;
+  if (value.boughtAt !== undefined && !isIsoTimestamp(value.boughtAt)) return false;
+  return true;
+}
+
 function isValidDrawHistoryEntry(value: unknown): value is DrawHistoryEntry {
   if (!isObjectRecord(value)) return false;
   if (!isNonEmptyString(value.id)) return false;
@@ -220,6 +261,20 @@ function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string';
 }
 
+function isHttpUrl(value: unknown): value is string {
+  if (!isNonEmptyString(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+}
+
 function areOptionalStrings(value: Record<string, unknown>, fields: string[]): boolean {
   return fields.every((field) => isOptionalString(value[field]));
 }
@@ -241,13 +296,16 @@ function isIsoTimestamp(value: unknown): value is string {
   return !Number.isNaN(Date.parse(value));
 }
 
-export function computeImportDiff(currentRecords: RecordItem[], incomingRecords: RecordItem[]): ImportDiff {
+export function computeImportDiff<T extends { id: string; updatedAt: string }>(
+  currentRecords: T[],
+  incomingRecords: T[]
+): ImportDiff<T> {
   const currentMap = new Map(currentRecords.map(r => [r.id, r]));
 
-  const additions: RecordItem[] = [];
-  const updates: ImportDiff['updates'] = [];
-  const conflicts: ImportDiff['conflicts'] = [];
-  const unchanged: RecordItem[] = [];
+  const additions: T[] = [];
+  const updates: ImportDiff<T>['updates'] = [];
+  const conflicts: ImportDiff<T>['conflicts'] = [];
+  const unchanged: T[] = [];
 
   for (const incoming of incomingRecords) {
     const current = currentMap.get(incoming.id);
