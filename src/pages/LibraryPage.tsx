@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAppData } from '../hooks/useAppData';
 import { useToast } from '../hooks/useToast';
 import { BusinessList } from '../components/BusinessList';
@@ -20,14 +20,6 @@ export const LibraryPage: React.FC = () => {
     wishlist: null,
   });
 
-  useEffect(() => {
-    tabRefs.current[activeTab]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-      inline: 'center',
-    });
-  }, [activeTab]);
-
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
@@ -46,7 +38,7 @@ export const LibraryPage: React.FC = () => {
 
   return (
     <div className="page-container">
-      <h1 className="section-title" style={{ marginBottom: 4 }}>
+      <h1 style={{ marginBottom: 4 }}>
         Library
       </h1>
       <p
@@ -74,12 +66,8 @@ export const LibraryPage: React.FC = () => {
           onKeyDown={handleTabKeyDown}
           aria-label="Business Inbox tab"
         >
-          <Briefcase
-            size={16}
-            style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
-            aria-hidden="true"
-          />
-          Business Inbox
+          <Briefcase size={16} aria-hidden="true" />
+          Business
         </button>
         <button
           id="library-tab-activities"
@@ -95,12 +83,8 @@ export const LibraryPage: React.FC = () => {
           onKeyDown={handleTabKeyDown}
           aria-label="My Activities tab"
         >
-          <Sparkles
-            size={16}
-            style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
-            aria-hidden="true"
-          />
-          My Activities
+          <Sparkles size={16} aria-hidden="true" />
+          Activities
         </button>
         <button
           id="library-tab-wishlist"
@@ -116,11 +100,7 @@ export const LibraryPage: React.FC = () => {
           onKeyDown={handleTabKeyDown}
           aria-label="Wishlist tab"
         >
-          <ShoppingBag
-            size={16}
-            style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
-            aria-hidden="true"
-          />
+          <ShoppingBag size={16} aria-hidden="true" />
           Wishlist
         </button>
       </div>

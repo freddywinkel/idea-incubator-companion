@@ -29,6 +29,11 @@ export function useModalFocus(isOpen: boolean, onClose: () => void) {
     const dialog = dialogRef.current;
     const previouslyFocused =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
 
     const focusFirstElement = () => {
       const [firstFocusable] = getFocusableElements(dialog);
@@ -79,6 +84,8 @@ export function useModalFocus(isOpen: boolean, onClose: () => void) {
       window.cancelAnimationFrame(focusFrame);
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('focusin', handleFocusIn);
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
       previouslyFocused?.focus({ preventScroll: true });
     };
   }, [isOpen]);

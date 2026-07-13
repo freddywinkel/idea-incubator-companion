@@ -74,7 +74,7 @@ export function buildAppBackup({
     schemaVersion: '1.1',
     backupId: crypto.randomUUID?.() ?? `${Date.now()}`,
     exportedAt: new Date().toISOString(),
-    appVersion: '1.1.0',
+    appVersion: '1.2.1',
     records,
     drawHistory,
     wishlistItems,
